@@ -1,4 +1,4 @@
-import express, { Express, Request, Response, NextFunction as _NextFunction } from 'express';
+import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
