@@ -6,7 +6,7 @@ import { AuthRequest, authenticate } from '../middleware/auth';
 const router = Router();
 
 // Get all users (protected)
-router.get('/', authenticate, async (req: AuthRequest, res: Response, next) => {
+router.get('/', authenticate, async (_req: AuthRequest, res: Response, next) => {
   try {
     const users = await prisma.user.findMany({
       select: { id: true, email: true, name: true, createdAt: true },

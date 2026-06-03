@@ -15,7 +15,7 @@ export const errorHandler = (
   err: any,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) => {
   logger.error({
     error: err.message,
