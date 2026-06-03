@@ -29,7 +29,7 @@ router.post('/register', async (req: AuthRequest, res: Response, next) => {
 
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || 'secret', {
       expiresIn: process.env.JWT_EXPIRY || '7d',
-    });
+    } as jwt.SignOptions);
 
     logger.info(`User registered: ${email}`);
     res.status(201).json({ user: { id: user.id, email, name }, token });
@@ -59,7 +59,7 @@ router.post('/login', async (req: AuthRequest, res: Response, next) => {
 
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || 'secret', {
       expiresIn: process.env.JWT_EXPIRY || '7d',
-    });
+    } as jwt.SignOptions);
 
     logger.info(`User logged in: ${email}`);
     res.json({ user: { id: user.id, email, name: user.name }, token });
