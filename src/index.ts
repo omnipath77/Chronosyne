@@ -13,9 +13,7 @@ import { requestLogger } from './middleware/requestLogger';
 dotenv.config();
 
 const app: Express = express();
-export const prisma = new PrismaClient({
-  datasourceUrl: process.env.DATABASE_URL,
-});
+export const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3000;
 
 // Logger
