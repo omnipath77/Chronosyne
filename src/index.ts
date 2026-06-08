@@ -50,14 +50,21 @@ app.use('/api/', limiter);
 // Request logging
 app.use(requestLogger);
 
-// Health check
-app.get('/health', async (_req: Request, res: Response) => {
+// Health check — responds immediately so the process is marked healthy as
+// soon as the HTTP server is ready, regardless of database state.
+app.get('/health', (_req: Request, res: Response) => {
+  res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// Deep health check — verifies database connectivity. Use this for monitoring
+// and alerting rather than the deployment healthcheck probe.
+app.get('/health/deep', async (_req: Request, res: Response) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+    res.status(200).json({ status: 'healthy', database: 'connected', timestamp: new Date().toISOString() });
   } catch (error) {
-    logger.error('Health check failed:', error);
-    res.status(503).json({ status: 'unhealthy', error: 'Database connection failed' });
+    logger.error('Deep health check failed:', error);
+    res.status(503).json({ status: 'unhealthy', database: 'unreachable', error: 'Database connection failed' });
   }
 });
 
