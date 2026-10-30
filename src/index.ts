@@ -4,7 +4,10 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
-import winston from 'winston';
+import { configureProxy } from './config/proxy';
+import { createLogger } from './logger';
+import { createRedisManager } from './redis';
+import { checkDependencies } from './health';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import { errorHandler } from './middleware/errorHandler';
@@ -13,22 +16,13 @@ import { requestLogger } from './middleware/requestLogger';
 dotenv.config();
 
 const app: Express = express();
+configureProxy(app, process.env);
 export const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3000;
 
 // Logger
-export const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.json(),
-  transports: [
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      ),
-    }),
-  ],
-});
+export const logger = createLogger();
+export const redis = createRedisManager(process.env.REDIS_URL, logger);
 
 // Middleware
 app.use(helmet());
@@ -56,16 +50,20 @@ app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
-// Deep health check — verifies database connectivity. Use this for monitoring
+// Deep health check — verifies database and configured Redis connectivity. Use for monitoring
 // and alerting rather than the deployment healthcheck probe.
 app.get('/health/deep', async (_req: Request, res: Response) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    res.status(200).json({ status: 'healthy', database: 'connected', timestamp: new Date().toISOString() });
-  } catch (error) {
-    logger.error('Deep health check failed:', error);
-    res.status(503).json({ status: 'unhealthy', database: 'unreachable', error: 'Database connection failed' });
+  const result = await checkDependencies(
+    () => prisma.$queryRaw`SELECT 1`,
+    () => redis.health()
+  );
+  if (result.statusCode !== 200) {
+    logger.warn('Dependency health check failed', {
+      database: result.body.database,
+      redis: result.body.redis,
+    });
   }
+  res.status(result.statusCode).json(result.body);
 });
 
 // Routes
@@ -92,6 +90,7 @@ app.use(errorHandler);
 // Graceful shutdown
 const gracefulShutdown = async () => {
   logger.info('Shutting down gracefully...');
+  redis.stop();
   await prisma.$disconnect();
   process.exit(0);
 };
@@ -100,6 +99,8 @@ process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
 // Start server
+// Keep liveness independent of dependency availability; deep health reports failures.
+void redis.start();
 app.listen(PORT, () => {
   logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
 });

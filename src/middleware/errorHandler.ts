@@ -17,7 +17,7 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ) => {
-  logger.error({
+  logger.error('Request failed', {
     error: err.message,
     stack: err.stack,
     path: req.path,
